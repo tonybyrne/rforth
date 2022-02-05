@@ -23,7 +23,7 @@ module Rforth
     def bootstrap_dictionary
       define_word('\\', ->(i) { i.skip })
       define_word('cold', ->(i) { i.cold_start })
-      define_word('bye', ->(i) { exit })
+      define_word('bye', ->(_i) { exit })
       define_word('immediate', ->(i) { i.immediate }, true)
       define_word('words', ->(i) { i.words })
       define_word('.', ->(i) { print i.pop; print ' ' })
@@ -53,7 +53,7 @@ module Rforth
 
     def start_compiling
       @compiling = true
-      @current_definition = Word.new()
+      @current_definition = Word.new(get_word)
     end
 
     def end_compiling
@@ -81,8 +81,9 @@ module Rforth
 
     def eval(string)
       @message = nil
-      words = string.split
-      eval_words(words) if words.any?
+      @words = string.split
+      @word_idx = 0
+      eval_words if @words.any?
       @message = 'ok.'
       @skip = false
       true
@@ -91,14 +92,20 @@ module Rforth
       false
     end
 
-    def eval_words(words)
-      words.each do |word|
+    def eval_words
+      while (word = get_word) do
         if immediate?
           execute_word(word)
         else
           compile_word(word)
         end
       end
+    end
+
+    def get_word
+      word = @words[@word_idx]
+      @word_idx += 1
+      word
     end
 
     def execute_word(word)
@@ -114,9 +121,7 @@ module Rforth
     end
 
     def compile_word(word)
-      if current_definition_unnamed?
-        set_current_definition_name_to(word)
-      elsif found_word = dictionary.find(word)
+      if found_word = dictionary.find(word)
         if found_word.immediate?
           found_word.execute(self)
         else
@@ -135,16 +140,6 @@ module Rforth
 
     def immediate?
       !compiling?
-    end
-
-    private
-
-    def current_definition_unnamed?
-      @current_definition.unnamed?
-    end
-
-    def set_current_definition_name_to(word)
-      @current_definition.name = word
     end
 
     def add_to_current_definition(action)
