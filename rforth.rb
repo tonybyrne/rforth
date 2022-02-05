@@ -3,21 +3,22 @@ require_relative 'lib/rforth'
 
 def welcome
   puts "Welcome to rForth"
-  prompt
 end
 
-def prompt
-  print "\n> "
+def prompt(i)
+  print "[#{i.stack.to_a.join(' ')}] > "
 end
 
 def main
   i = Rforth::Interpreter.new
 
   welcome
+  prompt(i)
+
   while line = gets
     i.eval(line)
-    puts " #{i.message}"
-    prompt
+    puts i.message
+    prompt(i)
   end
 end
 

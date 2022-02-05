@@ -10,23 +10,32 @@ module Rforth
     def_delegators :stack, :pop, :push, :dup
 
     def initialize
+      cold_start
+    end
+
+    def cold_start
       @compiling = false
       @stack = Stack.new
       @dictionary = Dictionary.new
-      define_primitives
+      bootstrap_dictionary
     end
 
-    def define_primitives
+    def bootstrap_dictionary
+      define_word('cold', [->(i) { i.cold_start }])
       define_word('bye', [->(i) { exit }])
-      define_word('.', [->(i) { print i.pop }])
+      define_word('.', [->(i) { print i.pop ; print ' ' }])
       define_word('drop', [->(i) { i.pop }])
-      define_word('dup', [->(i) { i.dup }])
+      define_word('dup', [->(i) { v = i.pop ; i.push(v) ; i.push(v) }])
+      define_word('swap', [->(i) { a = i.pop ; b = i.pop; i.push(a) ; i.push(b) }])
+      define_word('over', [->(i) { a = i.pop ; b = i.pop; i.push(b) ; i.push(a) ; i.push(b)}])
+      define_word('rot', [->(i) { a = i.pop ; b = i.pop; c = i.pop ; i.push(b) ; i.push(a) ; i.push(c) }])
       define_word(':', [->(i) { i.start_compiling }])
       define_word(';', [->(i) { i.end_compiling }], true)
       define_word('+', [->(i) { i.push(i.pop + i.pop) }])
-      define_word('-', [->(i) { a = i.pop; b = i.pop; i.push(b - a) }])
+      define_word('-', [->(i) { b = i.pop; a = i.pop; i.push(a - b) }])
       define_word('*', [->(i) { i.push(i.pop * i.pop) }])
-      define_word('/', [->(i) { a = i.pop; b = i.pop; i.push(b / a) }])
+      define_word('/', [->(i) { b = i.pop; a = i.pop; i.push(a / b) }])
+
     end
 
     def start_compiling
@@ -35,7 +44,7 @@ module Rforth
     end
 
     def end_compiling
-      define_word(@current_definition[:word], @current_definition[:actions].flatten)
+      define_word(@current_definition[:word], @current_definition[:actions])
       @compiling = false
     end
 
@@ -66,7 +75,7 @@ module Rforth
       else
         found_word = dictionary.find(word)
         if found_word
-          execute_definition(found_word)
+          found_word.execute(self)
         else
           raise WordNotFound, "#{word}?"
         end
@@ -81,10 +90,10 @@ module Rforth
       else
         found_word = dictionary.find(word)
         if found_word
-          if found_word[:immediate]
-            execute_definition(found_word)
+          if found_word.immediate?
+            found_word.execute(self)
           else
-            add_to_current_definition(found_word[:actions])
+            add_to_current_definition(->(i) { found_word.execute(i) })
           end
         else
           raise WordNotFound, "#{word}?"
@@ -110,12 +119,8 @@ module Rforth
       @current_definition[:word] = word
     end
 
-    def add_to_current_definition(actions)
-      @current_definition[:actions].push(actions)
-    end
-
-    def execute_definition(definition)
-      definition[:actions].each { |action| action.call(self) }
+    def add_to_current_definition(action)
+      @current_definition[:actions].push(action)
     end
   end
 end

@@ -1,5 +1,6 @@
 module Rforth
   require_relative 'rforth/errors'
+  require_relative 'rforth/word'
   require_relative 'rforth/dictionary'
   require_relative 'rforth/stack'
   require_relative 'rforth/interpreter'
