@@ -8,6 +8,10 @@ module Rforth
       @immediate = immediate
     end
 
+    def immediate!
+      @immediate = true
+    end
+
     def immediate?
       @immediate
     end

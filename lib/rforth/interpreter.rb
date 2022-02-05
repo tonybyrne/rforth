@@ -21,25 +21,34 @@ module Rforth
     end
 
     def bootstrap_dictionary
+      define_word('\\', ->(i) { i.skip })
       define_word('cold', ->(i) { i.cold_start })
       define_word('bye', ->(i) { exit })
-      define_word('.', ->(i) { print i.pop ; print ' ' })
+      define_word('immediate', ->(i) { i.immediate }, true)
+      define_word('words', ->(i) { i.words })
+      define_word('.', ->(i) { print i.pop; print ' ' })
       define_word('drop', ->(i) { i.pop })
-      define_word('dup', ->(i) { v = i.pop ; i.push(v) ; i.push(v) })
-      define_word('swap', ->(i) { a = i.pop ; b = i.pop; i.push(a) ; i.push(b) })
-      define_word('over', ->(i) { a = i.pop ; b = i.pop; i.push(b) ; i.push(a) ; i.push(b)})
-      define_word('rot', ->(i) { a = i.pop ; b = i.pop; c = i.pop ; i.push(b) ; i.push(a) ; i.push(c) })
+      define_word('dup', ->(i) { v = i.pop; i.push(v); i.push(v) })
+      define_word('swap', ->(i) { a = i.pop; b = i.pop; i.push(a); i.push(b) })
+      define_word('over', ->(i) { a = i.pop; b = i.pop; i.push(b); i.push(a); i.push(b) })
+      define_word('rot', ->(i) { a = i.pop; b = i.pop; c = i.pop; i.push(b); i.push(a); i.push(c) })
       define_word(':', ->(i) { i.start_compiling })
       define_word(';', ->(i) { i.end_compiling }, true)
       define_word('+', ->(i) { i.push(i.pop + i.pop) })
       define_word('-', ->(i) { b = i.pop; a = i.pop; i.push(a - b) })
       define_word('*', ->(i) { i.push(i.pop * i.pop) })
       define_word('/', ->(i) { b = i.pop; a = i.pop; i.push(a / b) })
+      define_word('=', ->(i) { push(i.pop == i.pop ? -1 : 0) })
+      define_word('!=', ->(i) { push(i.pop != i.pop ? -1 : 0) })
 
       self.eval(': ++ 1 + ;')
       self.eval(': -- 1 - ;')
       self.eval(': double 2 * ;')
       self.eval(': square dup * ;')
+    end
+
+    def skip
+      @skip = true
     end
 
     def start_compiling
@@ -52,11 +61,30 @@ module Rforth
       @compiling = false
     end
 
+    def immediate
+      if compiling?
+        @current_definition.immediate!
+      else
+        dictionary.latest.immediate!
+      end
+    end
+
+    def words
+      dictionary.words.each do |w|
+        if w.immediate
+          puts "#{w.name} (immediate)"
+        else
+          puts w.name
+        end
+      end
+    end
+
     def eval(string)
       @message = nil
       words = string.split
       eval_words(words) if words.any?
       @message = 'ok.'
+      @skip = false
       true
     rescue StandardError => e
       @message = e.message
@@ -74,34 +102,30 @@ module Rforth
     end
 
     def execute_word(word)
-      if word.numeric?
+      return if @skip
+
+      if found_word = dictionary.find(word)
+        found_word.execute(self)
+      elsif word.numeric?
         push(word.to_number)
       else
-        found_word = dictionary.find(word)
-        if found_word
-          found_word.execute(self)
-        else
-          raise WordNotFound, "#{word}?"
-        end
+        raise WordNotFound, "#{word}?"
       end
     end
 
     def compile_word(word)
       if current_definition_unnamed?
         set_current_definition_name_to(word)
-      elsif word.numeric?
+      elsif found_word = dictionary.find(word)
+        if found_word.immediate?
+          found_word.execute(self)
+        else
+          add_to_current_definition(->(i) { found_word.execute(i) })
+        end
+      elsif (word.numeric?)
         add_to_current_definition(->(i) { i.push(word.to_number) })
       else
-        found_word = dictionary.find(word)
-        if found_word
-          if found_word.immediate?
-            found_word.execute(self)
-          else
-            add_to_current_definition(->(i) { found_word.execute(i) })
-          end
-        else
-          raise WordNotFound, "#{word}?"
-        end
+        raise WordNotFound, "#{word}?"
       end
     end
 

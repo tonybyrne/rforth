@@ -1,5 +1,7 @@
 module Rforth
   class Dictionary
+    attr_reader :words
+
     def initialize
       @words = []
     end
@@ -12,11 +14,15 @@ module Rforth
       add_word(Word.new(name, actions, immediate))
     end
 
-    def last_word_idx
+    def lastest_word_idx
       @words.length - 1
     end
 
-    def find(word, index = last_word_idx)
+    def latest
+      return @words[lastest_word_idx]
+    end
+
+    def find(word, index = lastest_word_idx)
       while (index >= 0)
         if @words[index].name == word
           return @words[index]
