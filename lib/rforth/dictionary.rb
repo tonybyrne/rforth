@@ -4,8 +4,12 @@ module Rforth
       @words = []
     end
 
+    def add_word(word)
+      @words << word
+    end
+
     def define_word(name, actions, immediate = false)
-      @words << Word.new(name, actions, immediate)
+      add_word(Word.new(name, actions, immediate))
     end
 
     def last_word_idx
