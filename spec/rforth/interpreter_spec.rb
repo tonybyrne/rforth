@@ -4,6 +4,7 @@ RSpec.describe Rforth::Interpreter do
   subject(:interpreter) { described_class.new }
 
   let(:stack) { interpreter.stack }
+  let(:dictionary) { interpreter.dictionary }
 
   context 'when newly initialised' do
     it 'has an empty stack' do
@@ -21,6 +22,18 @@ RSpec.describe Rforth::Interpreter do
       it 'pushes the value onto the stack' do
         interpreter.eval('100')
         expect(stack.to_a).to eql [100]
+      end
+    end
+
+    context 'when passed an existing (primitive) word' do
+      before do
+        dictionary.define_word('dup', ->(i) { i.stack.dup })
+      end
+
+      it 'evaluates the word' do
+        stack.push(100)
+        interpreter.eval('dup')
+        expect(stack.to_a).to eql [100, 100]
       end
     end
   end

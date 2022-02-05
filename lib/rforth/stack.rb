@@ -24,5 +24,11 @@ module Rforth
     def empty?
       @items.empty?
     end
+
+    def dup
+      v = pop
+      push(v)
+      push(v)
+    end
   end
 end

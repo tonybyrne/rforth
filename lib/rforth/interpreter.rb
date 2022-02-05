@@ -16,24 +16,15 @@ module Rforth
       words.each do |word|
         process_word(word)
       end
-      # puts "OK"
-      # rescue RuntimeError => e
-      # puts "Error: #{e.message}"
     end
 
     def process_word(word)
-      # if word.numeric?
+      if word.numeric?
         stack.push(word.to_number)
-      # else
-      #   definition = find_word(word)
-      #   if definition == nil
-      #     raise RuntimeError, "'#{word}' not found in dictionary."
-      #   elsif definition[:builtin]
-      #     send definition[:builtin]
-      #   else
-      #     process_words(definition[:words])
-      #   end
-      # end
+      else
+        definition = dictionary.find(word)
+        definition.call(self)
+      end
     end
   end
 end
