@@ -1,7 +1,7 @@
 module Rforth
+  require_relative 'rforth/errors'
   require_relative 'rforth/dictionary'
   require_relative 'rforth/stack'
-  require_relative 'rforth/stack_underflow_error'
   require_relative 'rforth/interpreter'
 end
 
