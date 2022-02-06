@@ -69,7 +69,7 @@ module Rforth
     end
 
     def in_comment?
-      !@comment_stack.empty?
+      !@comment_stack.empty? || comment_to_eol?
     end
 
     def start_compiling
@@ -78,7 +78,7 @@ module Rforth
         raise Error, 'Nested compile!'
       else
         @compiling = true
-        @current_definition = Word.new(get_word)
+        @current_definition = Word.new
       end
     end
 
@@ -139,7 +139,7 @@ module Rforth
       @words = string.split
       @word_idx = 0
       eval_words if @words.any?
-      @message = 'ok.'
+      @message = 'ok.' unless compiling?
       @comment_to_eol = false
       true
     rescue StandardError => e
@@ -177,7 +177,9 @@ module Rforth
     end
 
     def compile_word(word)
-      if found_word = dictionary.find(word)
+      if @current_definition.unnamed?
+        @current_definition.name = word
+      elsif found_word = dictionary.find(word)
         if found_word.immediate? or found_word.control?
           found_word.call(self)
         else
