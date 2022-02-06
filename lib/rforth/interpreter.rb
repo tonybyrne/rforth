@@ -169,6 +169,8 @@ module Rforth
         found_word.call(self)
       elsif word.numeric?
         push(word.to_number) if in_executable_scope?
+      elsif in_comment?
+        # Do nothing
       else
         raise WordNotFound, "#{word}?"
       end
@@ -176,13 +178,15 @@ module Rforth
 
     def compile_word(word)
       if found_word = dictionary.find(word)
-        if found_word.immediate?
+        if found_word.immediate? or found_word.control?
           found_word.call(self)
         else
           add_to_current_definition(found_word)
         end
       elsif (word.numeric?)
         add_to_current_definition(->(i) { i.push(word.to_number) if i.in_executable_scope? })
+      elsif in_comment?
+        # Do nothing
       else
         raise WordNotFound, "#{word}?"
       end
