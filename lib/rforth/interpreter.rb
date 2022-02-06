@@ -142,8 +142,8 @@ module Rforth
       @message = 'ok.' unless compiling?
       @comment_to_eol = false
       true
-    rescue StandardError => e
-      @message = e.message
+    rescue StandardError, SystemStackError => e
+      @message = "Error: #{e.message}"
       false
     end
 
@@ -179,6 +179,8 @@ module Rforth
     def compile_word(word)
       if @current_definition.unnamed?
         @current_definition.name = word
+      elsif word == @current_definition.name
+        add_to_current_definition(->(i) { i.execute_word(word) if i.in_executable_scope? }) unless in_comment?
       elsif found_word = dictionary.find(word)
         if found_word.immediate? or found_word.comment?
           found_word.call(self)
