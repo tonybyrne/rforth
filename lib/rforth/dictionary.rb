@@ -10,8 +10,8 @@ module Rforth
       @words << word
     end
 
-    def define_word(name, actions, immediate:  false)
-      add_word(Word.new(name, actions, immediate))
+    def define_word(name, actions, immediate:  false, control: false)
+      add_word(Word.new(name, actions, immediate: immediate, control: control))
     end
 
     def lastest_word_idx

@@ -42,8 +42,9 @@ module Rforth
       define_word('=', ->(i) { push(i.pop == i.pop ? -1 : 0) })
       define_word('!=', ->(i) { push(i.pop != i.pop ? -1 : 0) })
 
-      define_word('if', ->(i) { i.control_if })
-      define_word('then', ->(i) { i.control_then })
+      define_word('if', ->(i) { i.control_if }, control: true)
+      define_word('then', ->(i) { i.control_then }, control: true)
+      define_word('else', ->(i) { i.control_else }, control: true)
 
       self.eval(': ++ 1 + ;')
       self.eval(': -- 1 - ;')
@@ -59,11 +60,16 @@ module Rforth
       @skip = false
     end
 
+    def toggle_skip
+      @skip = !@skip
+    end
+
     def skipping?
       @skip
     end
 
     def start_compiling
+      puts 'start-compiling'
       if @compiling
         @compiling = false
         raise Error, 'Nested compile!'
@@ -74,6 +80,7 @@ module Rforth
     end
 
     def end_compiling
+      puts 'end-compiling'
       if !@compiling
         raise Error, 'End compile when not compiling.'
       else
@@ -91,6 +98,7 @@ module Rforth
     end
 
     def control_if
+      puts 'control-if'
       value = stack.pop
       if value == -1
       else
@@ -99,7 +107,13 @@ module Rforth
     end
 
     def control_then
+      puts 'control-then'
       unskip
+    end
+
+    def control_else
+      puts 'control-else'
+      toggle_skip
     end
 
     def words
@@ -128,8 +142,10 @@ module Rforth
     def eval_words
       while (word = get_word) do
         if immediate?
+          puts 'in eval_words'
           execute_word(word)
         else
+          puts 'compilinf'
           compile_word(word)
         end
       end
@@ -142,11 +158,14 @@ module Rforth
     end
 
     def execute_word(word)
-      return if @skip
-
+      puts 'execute_word'
       if found_word = dictionary.find(word)
-        found_word.execute(self)
+        puts "found #{word}"
+        # return if skipping? && !word.control?
+        found_word.call(self)
       elsif word.numeric?
+        # return if skipping?
+        puts "numeric"
         push(word.to_number)
       else
         raise WordNotFound, "#{word}?"
@@ -156,12 +175,12 @@ module Rforth
     def compile_word(word)
       if found_word = dictionary.find(word)
         if found_word.immediate?
-          found_word.execute(self)
+          found_word.call(self)
         else
-          add_to_current_definition(->(i) { found_word.execute(i) })
+          add_to_current_definition(found_word)
         end
       elsif (word.numeric?)
-        add_to_current_definition(->(i) { i.push(word.to_number) })
+        add_to_current_definition(->(i) { i.push(word.to_number) unless i.skipping? })
       else
         raise WordNotFound, "#{word}?"
       end
