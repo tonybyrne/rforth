@@ -16,15 +16,11 @@ module Rforth
       @immediate
     end
 
-    def unnamed?
-      name.nil?
-    end
-
     def execute(interpreter)
       if actions.respond_to?(:call)
-        actions.call(interpreter)
+        actions.call(interpreter) unless interpreter.skipping?
       else
-        actions.each { |action| action.call(interpreter) }
+        actions.each { |action| action.call(interpreter) unless interpreter.skipping? }
       end
     end
   end

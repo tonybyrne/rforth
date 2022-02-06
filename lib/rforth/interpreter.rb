@@ -16,6 +16,7 @@ module Rforth
     def cold_start
       @compiling = false
       @stack = Stack.new
+      @control_flow_stack = Stack.new
       @dictionary = Dictionary.new
       bootstrap_dictionary
     end
@@ -24,7 +25,7 @@ module Rforth
       define_word('\\', ->(i) { i.skip })
       define_word('cold', ->(i) { i.cold_start })
       define_word('bye', ->(_i) { exit })
-      define_word('immediate', ->(i) { i.immediate }, true)
+      define_word('immediate', ->(i) { i.immediate }, immediate: true)
       define_word('words', ->(i) { i.words })
       define_word('.', ->(i) { print i.pop; print ' ' })
       define_word('drop', ->(i) { i.pop })
@@ -32,14 +33,17 @@ module Rforth
       define_word('swap', ->(i) { a = i.pop; b = i.pop; i.push(a); i.push(b) })
       define_word('over', ->(i) { a = i.pop; b = i.pop; i.push(b); i.push(a); i.push(b) })
       define_word('rot', ->(i) { a = i.pop; b = i.pop; c = i.pop; i.push(b); i.push(a); i.push(c) })
-      define_word(':', ->(i) { i.start_compiling })
-      define_word(';', ->(i) { i.end_compiling }, true)
+      define_word(':', ->(i) { i.start_compiling}, immediate: true )
+      define_word(';', ->(i) { i.end_compiling }, immediate: true)
       define_word('+', ->(i) { i.push(i.pop + i.pop) })
       define_word('-', ->(i) { b = i.pop; a = i.pop; i.push(a - b) })
       define_word('*', ->(i) { i.push(i.pop * i.pop) })
       define_word('/', ->(i) { b = i.pop; a = i.pop; i.push(a / b) })
       define_word('=', ->(i) { push(i.pop == i.pop ? -1 : 0) })
       define_word('!=', ->(i) { push(i.pop != i.pop ? -1 : 0) })
+
+      define_word('if', ->(i) { i.control_if })
+      define_word('then', ->(i) { i.control_then })
 
       self.eval(': ++ 1 + ;')
       self.eval(': -- 1 - ;')
@@ -51,14 +55,31 @@ module Rforth
       @skip = true
     end
 
+    def unskip
+      @skip = false
+    end
+
+    def skipping?
+      @skip
+    end
+
     def start_compiling
-      @compiling = true
-      @current_definition = Word.new(get_word)
+      if @compiling
+        @compiling = false
+        raise Error, 'Nested compile!'
+      else
+        @compiling = true
+        @current_definition = Word.new(get_word)
+      end
     end
 
     def end_compiling
-      add_word(@current_definition)
-      @compiling = false
+      if !@compiling
+        raise Error, 'End compile when not compiling.'
+      else
+        add_word(@current_definition)
+        @compiling = false
+      end
     end
 
     def immediate
@@ -67,6 +88,18 @@ module Rforth
       else
         dictionary.latest.immediate!
       end
+    end
+
+    def control_if
+      value = stack.pop
+      if value == -1
+      else
+        skip
+      end
+    end
+
+    def control_then
+      unskip
     end
 
     def words

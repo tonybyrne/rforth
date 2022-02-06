@@ -10,7 +10,7 @@ module Rforth
       @words << word
     end
 
-    def define_word(name, actions, immediate = false)
+    def define_word(name, actions, immediate:  false)
       add_word(Word.new(name, actions, immediate))
     end
 
