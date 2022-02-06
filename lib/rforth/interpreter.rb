@@ -23,9 +23,9 @@ module Rforth
     end
 
     def bootstrap_dictionary
-      define_word('//', ->(i) { i.comment_to_eol })
-      define_word('(', ->(i) { i.start_comment }, control: true)
-      define_word(')', ->(i) { i.end_comment }, control: true)
+      define_word('//', ->(i) { i.comment_to_eol }, comment: true)
+      define_word('(', ->(i) { i.start_comment }, comment: true)
+      define_word(')', ->(i) { i.end_comment }, comment: true)
       define_word('cold', ->(i) { i.cold_start })
       define_word('bye', ->(_i) { exit })
       define_word('immediate', ->(i) { i.immediate }, immediate: true)
@@ -75,7 +75,7 @@ module Rforth
     def start_compiling
       if @compiling
         @compiling = false
-        raise Error, 'Nested compile!'
+        raise Error, "':' (start compile) while already compiling!"
       else
         @compiling = true
         @current_definition = Word.new
@@ -84,7 +84,7 @@ module Rforth
 
     def end_compiling
       if !@compiling
-        raise Error, 'End compile when not compiling.'
+        raise Error, "';' (end compile) when not compiling!"
       else
         add_word(@current_definition)
         @compiling = false
@@ -149,10 +149,10 @@ module Rforth
 
     def eval_words
       while word = get_word do
-        if immediate?
-          execute_word(word)
-        else
+        if compiling?
           compile_word(word)
+        else
+          execute_word(word)
         end
       end
     end
@@ -180,13 +180,13 @@ module Rforth
       if @current_definition.unnamed?
         @current_definition.name = word
       elsif found_word = dictionary.find(word)
-        if found_word.immediate? or found_word.control?
+        if found_word.immediate? or found_word.comment?
           found_word.call(self)
         else
-          add_to_current_definition(found_word)
+          add_to_current_definition(found_word) unless in_comment?
         end
       elsif (word.numeric?)
-        add_to_current_definition(->(i) { i.push(word.to_number) if i.in_executable_scope? })
+        add_to_current_definition(->(i) { i.push(word.to_number) if i.in_executable_scope? }) unless in_comment?
       elsif in_comment?
         # Do nothing
       else
@@ -196,10 +196,6 @@ module Rforth
 
     def compiling?
       @compiling
-    end
-
-    def immediate?
-      !compiling?
     end
 
     def add_to_current_definition(action)

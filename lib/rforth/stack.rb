@@ -1,5 +1,13 @@
+require 'forwardable'
+
 module Rforth
   class Stack
+    extend Forwardable
+
+    attr_reader :items
+
+    def_delegators :items, :empty?, :all?
+
     def initialize
       @items = []
     end
@@ -19,14 +27,6 @@ module Rforth
 
     def depth
       @items.length
-    end
-
-    def empty?
-      @items.empty?
-    end
-
-    def all?(&block)
-      @items.all?(&block)
     end
   end
 end

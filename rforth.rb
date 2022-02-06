@@ -6,7 +6,12 @@ def welcome
 end
 
 def prompt(i)
-  print "[#{i.stack.to_a.join(' ')}] > "
+  if i.compiling?
+    print "(compiling) > "
+  else
+    print "[#{i.stack.to_a.join(' ')}] > "
+  end
+
 end
 
 def main
@@ -17,7 +22,7 @@ def main
 
   while line = gets
     i.eval(line)
-    puts i.message
+    puts i.message if i.message
     prompt(i)
   end
 end
