@@ -22,8 +22,7 @@ module Rforth
     end
 
     def call(interpreter)
-      return if interpreter.skipping? && !control?
-      puts " about to exec #{name} #{@control}"
+      return unless interpreter.in_executable_scope? || control?
 
       if actions.respond_to?(:call)
         actions.call(interpreter)

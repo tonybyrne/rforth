@@ -24,5 +24,9 @@ module Rforth
     def empty?
       @items.empty?
     end
+
+    def all?(&block)
+      @items.all?(&block)
+    end
   end
 end

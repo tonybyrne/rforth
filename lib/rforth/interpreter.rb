@@ -17,23 +17,25 @@ module Rforth
       @compiling = false
       @stack = Stack.new
       @control_flow_stack = Stack.new
+      @comment_stack = Stack.new
       @dictionary = Dictionary.new
       bootstrap_dictionary
     end
 
     def bootstrap_dictionary
-      define_word('\\', ->(i) { i.skip })
+      define_word('//', ->(i) { i.comment_to_eol })
+      define_word('(', ->(i) { i.start_comment }, control: true)
+      define_word(')', ->(i) { i.end_comment }, control: true)
       define_word('cold', ->(i) { i.cold_start })
       define_word('bye', ->(_i) { exit })
       define_word('immediate', ->(i) { i.immediate }, immediate: true)
-      define_word('words', ->(i) { i.words })
       define_word('.', ->(i) { print i.pop; print ' ' })
       define_word('drop', ->(i) { i.pop })
       define_word('dup', ->(i) { v = i.pop; i.push(v); i.push(v) })
       define_word('swap', ->(i) { a = i.pop; b = i.pop; i.push(a); i.push(b) })
       define_word('over', ->(i) { a = i.pop; b = i.pop; i.push(b); i.push(a); i.push(b) })
       define_word('rot', ->(i) { a = i.pop; b = i.pop; c = i.pop; i.push(b); i.push(a); i.push(c) })
-      define_word(':', ->(i) { i.start_compiling}, immediate: true )
+      define_word(':', ->(i) { i.start_compiling }, immediate: true)
       define_word(';', ->(i) { i.end_compiling }, immediate: true)
       define_word('+', ->(i) { i.push(i.pop + i.pop) })
       define_word('-', ->(i) { b = i.pop; a = i.pop; i.push(a - b) })
@@ -43,7 +45,7 @@ module Rforth
       define_word('!=', ->(i) { push(i.pop != i.pop ? -1 : 0) })
 
       define_word('if', ->(i) { i.control_if }, control: true)
-      define_word('then', ->(i) { i.control_then }, control: true)
+      define_word('endif', ->(i) { i.control_endif }, control: true)
       define_word('else', ->(i) { i.control_else }, control: true)
 
       self.eval(': ++ 1 + ;')
@@ -52,24 +54,25 @@ module Rforth
       self.eval(': square dup * ;')
     end
 
-    def skip
-      @skip = true
+    def in_executable_scope?
+      return false if in_comment?
+
+      @control_flow_stack.empty? || @control_flow_stack.all? { |condition| condition }
     end
 
-    def unskip
-      @skip = false
+    def comment_to_eol
+      @comment_to_eol = true
     end
 
-    def toggle_skip
-      @skip = !@skip
+    def comment_to_eol?
+      @comment_to_eol
     end
 
-    def skipping?
-      @skip
+    def in_comment?
+      !@comment_stack.empty?
     end
 
     def start_compiling
-      puts 'start-compiling'
       if @compiling
         @compiling = false
         raise Error, 'Nested compile!'
@@ -80,13 +83,23 @@ module Rforth
     end
 
     def end_compiling
-      puts 'end-compiling'
       if !@compiling
         raise Error, 'End compile when not compiling.'
       else
         add_word(@current_definition)
         @compiling = false
       end
+    end
+
+    def start_comment
+      @comment_stack.push(true)
+    end
+
+    def end_comment
+      if @comment_stack.empty?
+        raise Error, "')' without preceding '('!"
+      end
+      @comment_stack.pop
     end
 
     def immediate
@@ -98,32 +111,27 @@ module Rforth
     end
 
     def control_if
-      puts 'control-if'
       value = stack.pop
       if value == -1
+        @control_flow_stack.push(true)
       else
-        skip
+        @control_flow_stack.push(false)
       end
     end
 
-    def control_then
-      puts 'control-then'
-      unskip
+    def control_endif
+      if @control_flow_stack.empty?
+        raise "'endif' without preceding 'if'!"
+      end
+      @control_flow_stack.pop
     end
 
     def control_else
-      puts 'control-else'
-      toggle_skip
-    end
-
-    def words
-      dictionary.words.each do |w|
-        if w.immediate
-          puts "#{w.name} (immediate)"
-        else
-          puts w.name
-        end
+      if @control_flow_stack.empty?
+        raise "'else' without preceding 'if'!"
       end
+      v = @control_flow_stack.pop
+      @control_flow_stack.push(!v)
     end
 
     def eval(string)
@@ -132,7 +140,7 @@ module Rforth
       @word_idx = 0
       eval_words if @words.any?
       @message = 'ok.'
-      @skip = false
+      @comment_to_eol = false
       true
     rescue StandardError => e
       @message = e.message
@@ -140,33 +148,27 @@ module Rforth
     end
 
     def eval_words
-      while (word = get_word) do
+      while word = get_word do
         if immediate?
-          puts 'in eval_words'
           execute_word(word)
         else
-          puts 'compilinf'
           compile_word(word)
         end
       end
     end
 
     def get_word
+      return if comment_to_eol?
       word = @words[@word_idx]
       @word_idx += 1
       word
     end
 
     def execute_word(word)
-      puts 'execute_word'
       if found_word = dictionary.find(word)
-        puts "found #{word}"
-        # return if skipping? && !word.control?
         found_word.call(self)
       elsif word.numeric?
-        # return if skipping?
-        puts "numeric"
-        push(word.to_number)
+        push(word.to_number) if in_executable_scope?
       else
         raise WordNotFound, "#{word}?"
       end
@@ -180,7 +182,7 @@ module Rforth
           add_to_current_definition(found_word)
         end
       elsif (word.numeric?)
-        add_to_current_definition(->(i) { i.push(word.to_number) unless i.skipping? })
+        add_to_current_definition(->(i) { i.push(word.to_number) if i.in_executable_scope? })
       else
         raise WordNotFound, "#{word}?"
       end
