@@ -26,6 +26,10 @@ module Rforth
       @comment
     end
 
+    def compile_only?
+      comment? || control?
+    end
+
     def unnamed?
       @name == nil
     end
@@ -36,7 +40,11 @@ module Rforth
       if actions.respond_to?(:call)
         actions.call(interpreter)
       else
-        actions.each { |action| action.call(interpreter) }
+        interpreter.action_idx = 0
+        while actions[interpreter.action_idx]
+          actions[interpreter.action_idx].call(interpreter)
+          interpreter.action_idx += 1
+        end
       end
     end
 

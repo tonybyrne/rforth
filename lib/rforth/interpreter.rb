@@ -5,6 +5,7 @@ module Rforth
     extend Forwardable
 
     attr_reader :stack, :dictionary, :message
+    attr_accessor :action_idx
 
     def_delegators :dictionary, :define_word, :add_word
     def_delegators :stack, :pop, :push, :dup
@@ -17,6 +18,7 @@ module Rforth
       @compiling = false
       @stack = Stack.new
       @control_flow_stack = Stack.new
+      @loop_stack = Stack.new
       @comment_stack = Stack.new
       @dictionary = Dictionary.new
       bootstrap_dictionary
@@ -47,6 +49,10 @@ module Rforth
       define_word('if', ->(i) { i.control_if }, control: true)
       define_word('endif', ->(i) { i.control_endif }, control: true)
       define_word('else', ->(i) { i.control_else }, control: true)
+
+      define_word('do', ->(i) { i.control_do }, control: true)
+      define_word('loop', ->(i) { i.control_loop }, control: true)
+      define_word('i', ->(i) { i.push_i })
 
       self.eval(': ++ 1 + ;')
       self.eval(': -- 1 - ;')
@@ -134,6 +140,30 @@ module Rforth
       @control_flow_stack.push(!v)
     end
 
+    def control_do
+      @loop_stack.push(idx: stack.pop, limit: stack.pop, location: @action_idx)
+    end
+
+    def control_loop
+      lp = @loop_stack.pop
+      idx = lp[:idx] + 1
+      limit = lp[:limit]
+      location = lp[:location]
+
+      if idx < limit
+        @loop_stack.push(idx: idx, limit: limit, location: location)
+        @action_idx = location
+      end
+    end
+
+    def push_i
+      if @loop_stack.top
+        stack.push @loop_stack.top[:idx]
+      else
+        raise Error, "'i' referenced outside a do .. loop!"
+      end
+    end
+
     def eval(string)
       @message = nil
       @words = string.split
@@ -166,11 +196,13 @@ module Rforth
 
     def execute_word(word)
       if found_word = dictionary.find(word)
-        found_word.call(self)
+        if found_word.compile_only?
+          raise Error, "'#{word}' can only be used within a word definition!"
+        else
+          found_word.call(self)
+        end
       elsif word.numeric?
-        push(word.to_number) if in_executable_scope?
-      elsif in_comment?
-        # Do nothing
+        push(word.to_number)
       else
         raise WordNotFound, "#{word}?"
       end

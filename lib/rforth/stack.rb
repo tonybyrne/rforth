@@ -28,5 +28,9 @@ module Rforth
     def depth
       @items.length
     end
+
+    def top
+      @items.last
+    end
   end
 end
