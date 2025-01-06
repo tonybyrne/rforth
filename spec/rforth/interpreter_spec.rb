@@ -46,7 +46,7 @@ RSpec.describe Rforth::Interpreter do
 
       it 'sets message to word not found error' do
         interpreter.eval('a_non_existent_word')
-        expect(interpreter.message).to eql 'a_non_existent_word?'
+        expect(interpreter.message).to eql 'Error: a_non_existent_word?'
       end
     end
 
@@ -84,7 +84,7 @@ RSpec.describe Rforth::Interpreter do
 
       it 'sets an error message' do
         interpreter.eval(invalid)
-        expect(interpreter.message).to eql 'invalid_word?'
+        expect(interpreter.message).to eql 'Error: invalid_word?'
       end
     end
 
@@ -95,7 +95,7 @@ RSpec.describe Rforth::Interpreter do
 
       it 'sets the stack underflow error message' do
         interpreter.eval('drop')
-        expect(interpreter.message).to eql 'Stack underflow!'
+        expect(interpreter.message).to eql 'Error: Stack underflow!'
       end
     end
 
